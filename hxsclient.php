@@ -1,15 +1,22 @@
 <?PHP
 /**
 
-	HXSClient copied last on 11.11.'11 @ 10:36 (update or include anew plz)
+	HXS API (v2) Webservices Client
 
-	This version is last updated on:
-		24.11.2011 @ afternoon
+	The HostingXS API Client is an open source library to implement products & services on own interfaces.
+
+		W-Information:	http://api.hostingxs.nl
+		E-Contact:	info@hostingxs.nl
+		E-Support:	support@hostingxs.nl
+
+	i)	Please note that this client requires a valid reseller login ID and password
+	i)	Implementation of this API client without adhering to the requirements on api.hostingxs.nl is at your own risk
+	i)	Costs forthcoming from mis-/abusing this client library are passed on to the client implementer
 
 */
 class hxsclient {
-	
-	private $url		= "http://api.hostingxs.nl/v2/";
+	// URL is fixed; we highly recommend leaving it as is
+	private $url		= "https://api.hostingxs.nl/v2/";
 	private $apikey		= false;
 	public $error		= false;
 	
