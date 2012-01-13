@@ -16,7 +16,7 @@
 */
 class hxsclient {
 	// URL is fixed; we highly recommend leaving it as is
-	private $url		= "https://api.hostingxs.nl/v2/";
+	private $url		= "http://api.hostingxs.nl/v2/";
 	private $apikey		= false;
 	public $error		= false;
 	
