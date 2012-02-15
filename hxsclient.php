@@ -28,6 +28,12 @@ class hxsclient {
 			$this -> auth( $un , $pw );
 		}
 	}
+	/**
+		
+	*/
+	/**
+		Domain checking
+	*/
 	function checkDomain( $dom=false ) {
 		return $this -> checkDomains( array( $dom ) );
 	}
@@ -41,10 +47,9 @@ class hxsclient {
 		curl_setopt( $this -> c , CURLOPT_HTTPGET , true );
 		return json_decode(curl_exec( $this -> c ));
 	}
-	private function constructURI( $command ) {
-		curl_setopt( $this -> c , CURLOPT_URL , $this -> url . $command . ($this -> apikey ? "?apikey=".$this -> apikey : "?ip=".$_SERVER['REMOTE_ADDR'] ));
-		return true;
-	}
+	/**
+		Supporting functions
+	*/
 	public function auth( $resellerid , $resellerpass ) {
 		$this -> constructURI( "auth/login/" );
 		curl_setopt( $this -> c , CURLOPT_HTTPAUTH , CURLAUTH_BASIC );
@@ -59,6 +64,10 @@ class hxsclient {
 		curl_setopt( $this -> c , CURLOPT_HTTPAUTH , false );
 		curl_setopt( $this -> c , CURLOPT_USERPWD , false );
 	}
+	private function constructURI( $command ) {
+		curl_setopt( $this -> c , CURLOPT_URL , $this -> url . $command . ($this -> apikey ? "?apikey=".$this -> apikey : "?ip=".$_SERVER['REMOTE_ADDR'] ));
+		return true;
+	}
 	private function continueSession() {
 		@session_start();
 		if(isset($_SESSION['hxsapikey'])) {
@@ -67,6 +76,7 @@ class hxsclient {
 	}
 	function __destruct() {
 		if( $this -> apikey ) {
+			// probably unnecessary but do it anyway
 			@session_start();
 			$_SESSION['hxsapikey']		= $this -> apikey;
 		}
