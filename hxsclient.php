@@ -16,7 +16,7 @@
 */
 class hxsclient {
 	// URL is fixed; we highly recommend leaving it as is
-	private $url		= "http://api.hostingxs.nl/v2/";
+	private $url		= "https://api.hostingxs.nl/v2/";
 	private $apikey		= false;
 	public $error		= false;
 	
@@ -59,7 +59,7 @@ class hxsclient {
 		if( $this -> error ) {
 			return false;
 		}
-		$this -> apikey		= $this -> auth -> hash;
+		$this -> apikey		= $this -> auth -> apikey;
 		
 		curl_setopt( $this -> c , CURLOPT_HTTPAUTH , false );
 		curl_setopt( $this -> c , CURLOPT_USERPWD , false );
