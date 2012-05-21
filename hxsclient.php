@@ -112,17 +112,17 @@ class hxsclient {
 	*/
 	public function auth( $sandbox=false ) {
 		if( self::$attempts > 5 ) { exit(__CLASS__ . ": too many attempts to connect to remote API server"); }
-		$this -> constructURI( sprintf( "auth/login/%s?ip=%s" , ($sandbox ? 1 : 0) , $_SERVER['REMOTE_ADDR'] ));
+		$this -> constructURI( sprintf( "auth/login/%s" , ($sandbox ? 1 : false) ));
 #		$this -> constructURI( "auth/login/?ip=".$_SERVER['REMOTE_ADDR'] );
 		curl_setopt( $this -> c , CURLOPT_HTTPAUTH , CURLAUTH_BASIC );
-		$this -> setGet();
+#		$this -> setGet();
 		curl_setopt( $this -> c , CURLOPT_USERPWD , implode(":", array( (int) $this -> un , (string) $this -> pw )));
 		$this -> auth				= json_decode( curl_exec( $this -> c ));
 		if( $this -> error ) {
 			return false;
 		}
 		$this -> apikey		= $this -> auth -> apikey;
-		
+		$this -> setGet();
 		curl_setopt( $this -> c , CURLOPT_HTTPAUTH , false );
 		curl_setopt( $this -> c , CURLOPT_USERPWD , false );
 		self::$attempts++;
@@ -131,11 +131,11 @@ class hxsclient {
 		return curl_getinfo( $this -> c );
 	}
 	private function setGet() {
-		curl_setopt( $this -> c , CURLOPT_CUSTOMREQUEST , null );
+//		curl_setopt( $this -> c , CURLOPT_CUSTOMREQUEST , null );
 		curl_setopt( $this -> c , CURLOPT_HTTPGET , true );
 	}
 	private function setPost() {
-		curl_setopt( $this -> c , CURLOPT_CUSTOMREQUEST , null );
+//		curl_setopt( $this -> c , CURLOPT_CUSTOMREQUEST , null );
 		curl_setopt( $this -> c , CURLOPT_POST , true );
 	}
 	private function setDelete() {
