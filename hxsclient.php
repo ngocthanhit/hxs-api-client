@@ -12,7 +12,9 @@
 	i)	Please note that this client requires a valid reseller login ID and password
 	i)	Implementation of this API client without adhering to the requirements on api.hostingxs.nl is at your own risk
 	i)	Costs forthcoming from mis-/abusing this client library are passed on to the (client) implementer
-
+	
+	@author		D. Klabbers - HostingXS B.V.
+	@date		22 Mai 2012
 */
 class hxsclient {
 	// URL is fixed; we highly recommend leaving it as is
@@ -172,3 +174,192 @@ class hxsclient {
 		}
 	}
 } 
+
+
+
+class hxs_customer {
+	public $new				= false;
+	/**
+	*	
+	*	@return 	customer object for use in API v2
+	*	@var 		seed 	customer object received from API or an array from forms or false to create the object
+	*/
+	public function __construct( $seed=false ) {
+		if( $seed && $this -> validateSeed( $seed ) ) {
+			
+		} else {
+			$this -> new 		= true;
+		}
+	}
+	/**
+	*	@note		validates seeded object from api or array from form
+	*
+	*/
+	private function validateSeed( $seed ) {
+		// validate seed as either object or array
+		if( !is_object( $seed ) && is_array( $seed )) {
+			$tmp		= new Object;
+			foreach( $seed as $field => $value ) {
+				$tmp -> $field = $value;
+			}
+			$seed		= $tmp;
+		} elseif( !is_object( $seed )) {
+			throw new Exception( "Values submitted are not an object nor an array, cannot seed customer object."); 
+		}
+		$fields			= array(
+								"firstname"	=> array(
+												"required",
+												"title"		=> "first name",
+												"validates"	=> "string",
+								),
+								"lastname"	=> array(
+												"required",
+												"title"		=> "last name",
+												"validates"	=> "string",
+								),
+								"initials"	=> array(
+												"required",
+												"validates"	=> "string",
+								),
+								"address"	=> array(
+												"required",
+												"validates"	=> "string",
+								),
+								"postal"	=> array(
+												"required",
+												"title"		=> "postal code",
+												"validates"	=> "string",
+								),
+								"city"	=> array(
+												"required",
+												"validates"	=> "string",
+								),
+								"country"	=> array(
+												"required",
+												"validates"	=> "string",
+												"length"	=> 2,
+								),
+								"phone"	=> array(
+												"required",
+												"title"		=> "phone number",
+												"validates"	=> "phone",
+								),
+								"email"	=> array(
+												"required",
+												"title"		=> "e-mail address",
+												"validates"	=> "email",
+								),
+								// username is checked seperately
+								"un"	=> array(
+												"title"		=> "username",
+								),
+								// password is checked seperately
+								"pw"	=> array(
+												"title"		=> "password",
+								),
+								// dob only necessary for private person (legal form 9)
+								"dob"	=> array(
+												"title"		=> "date of birth",
+												"validates"	=> "date",
+								),
+								"gender"	=> array(
+												"required",
+								),
+								"houseno"	=> array(
+												"required",
+												"title"		=> "house number",
+												"validates"	=> "integer",
+								),
+								"legal"	=> array(
+												"required",
+												"title"		=> "legal form",
+												"validates"	=> "integer",
+								),
+								"company"	=> array(
+												"title"		=> "company name",
+												"validates"	=> "string",
+								),
+								"vat"	=> array(
+												"title"		=> "VAT number",
+												"validates"	=> "vat",
+								),
+								"coc"	=> array(
+												"title"		=> "chamber of commerce",
+												"validates"	=> "string",
+								),
+								"housenoext"	=> array(
+												"title"		=> "house number extension",
+												"validates"	=> "string",
+								),
+								"invoice_to_ref" => array(
+												"title"		=> "send invoice to reseller",
+												"validates"	=> "boolean",
+								),
+		);
+		foreach( $fields as $fieldname => $opts ) {
+			// field is required
+			if( isset( $opts['required'] ) && !isset( $seed -> $fieldname )) {
+				throw new Exception( sprintf( "%s is required." , isset($opts['title']) ? $opts['title'] : $fieldname ) );
+			}
+			if( isset( $seed -> $fieldname ) && isset( $opts['validates'] )) {
+				switch( $opts['validates'] ) {
+					case "string":
+						if( !is_string( $seed -> $fieldname )) {
+							throw new Exception( sprintf( "%s did not validate as proper text." , isset($opts['title']) ? $opts['title'] : $fieldname ));
+						}
+						break;
+					case "integer":
+						if( !is_int( $seed -> $fieldname ) && !( (int) $seed -> $fieldname == $seed -> $fieldname )) {
+							throw new Exception( sprintf( "%s did not validate as proper number." , isset($opts['title']) ? $opts['title'] : $fieldname ));
+						}
+						$seed -> $fieldname		= (int) $seed -> $fieldname;
+						break;
+					case "date":
+						if( $fieldname == "dob" && !isset($seed -> $fieldname) && $seed -> legal != 9 ) { continue; }
+						$regex	= "/^[0-9]{4}-[0-9]{2}-[0-9]{2}$/i";
+						if( !preg_match( $regex , $seed -> $fieldname )) {
+							throw new Exception( sprintf( "%s did not validate as proper date, use YYYY-MM-DD." , isset($opts['title']) ? $opts['title'] : $fieldname ));
+						}
+						break;
+					case "phone":
+						$regex	= "/^((\+|00)[0-9]{2})([0-9-\. ]{5,})?$/i";
+						if( !preg_match( $regex , $seed -> $fieldname )) {
+							throw new Exception( sprintf( "%s did not validate as a proper phone number, either use an international format or a national one." , isset($opts['title']) ? $opts['title'] : $fieldname ));
+						}
+						break;
+					case "un":
+						if( $this -> new && !isset( $seed -> $fieldname )) {
+							throw new Exception( sprintf( "%s not entered, which is required for new customers." , isset($opts['title']) ? $opts['title'] : $fieldname ));
+						}
+						$regex	= "/^[a-z]([-_a-z0-9]){2,31}$/";
+						if( !preg_match( $regex , $seed -> $fieldname )) {
+							throw new Exception( sprintf( "%s did not validate as proper username, between 3 and 32 in length, start with a letter and may only contain lowercase letters, numbers and _ or -." , isset($opts['title']) ? $opts['title'] : $fieldname ));
+						}
+						break;
+					case "email":
+						$regex = "/^[A-Z0-9._%-]+@[A-Z0-9.-]+\.[A-Z]{2,4}$/i";
+						if( !preg_match( $regex , $seed -> $fieldname )) {
+							throw new Exception( sprintf( "%s did not validate as proper e-mail address." , isset($opts['title']) ? $opts['title'] : $fieldname ));
+						}
+						break;
+					case "vat":
+						$regex = "/^([a-z]{2})?[0-9a-z]+$/i";
+						if( !preg_match( $regex , $seed -> $fieldname )) {
+							throw new Exception( sprintf( "%s did not validate as proper international VAT number." , isset($opts['title']) ? $opts['title'] : $fieldname ));
+						}
+						break;
+					case "boolean":
+						if( !is_bool($seed -> fieldname ) && !is_int($seed -> $fieldname ) ) {
+							throw new Exception( sprintf( "%s not enabled or disabled." , isset($opts['title']) ? $opts['title'] : $fieldname ));
+						}
+						break;
+				}
+			}
+			if( isset($opts['length']) && strlen( $seed -> $fieldname) != $opts['length'] ) {
+				throw new Exception( sprintf( "%s is of an incorrect length, should be %d." , isset($opts['title']) ? $opts['title'] : $fieldname , $opts['length']));
+			}
+			$this -> $fieldname 	= $seed -> $fieldname;
+		}
+		return $this;
+	}
+}
