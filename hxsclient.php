@@ -132,14 +132,19 @@ class hxsclient {
 	public function debug() {
 		return curl_getinfo( $this -> c );
 	}
+	// SAVE
+	private function setPut() {
+		curl_setopt( $this -> c , CURLOPT_CUSTOMREQUEST , "PUT" );
+	}
+	// LOAD
 	private function setGet() {
-//		curl_setopt( $this -> c , CURLOPT_CUSTOMREQUEST , null );
 		curl_setopt( $this -> c , CURLOPT_HTTPGET , true );
 	}
+	// INSERT
 	private function setPost() {
-//		curl_setopt( $this -> c , CURLOPT_CUSTOMREQUEST , null );
 		curl_setopt( $this -> c , CURLOPT_POST , true );
 	}
+	// ERASE
 	private function setDelete() {
 		curl_setopt( $this -> c , CURLOPT_CUSTOMREQUEST , "DELETE" );
 	}
@@ -178,18 +183,15 @@ class hxsclient {
 
 
 class hxs_customer {
-	public $new				= false;
 	/**
 	*	
 	*	@return 	customer object for use in API v2
 	*	@var 		seed 	customer object received from API or an array from forms or false to create the object
 	*/
 	public function __construct( $seed=false ) {
-		if( $seed && $this -> validateSeed( $seed ) ) {
-			
-		} else {
-			$this -> new 		= true;
-		}
+		if( $seed && $c = $this -> validateSeed( $seed ) ) {
+			return $c;
+		} else { return false; }
 	}
 	/**
 	*	@note		validates seeded object from api or array from form
@@ -328,12 +330,17 @@ class hxs_customer {
 						}
 						break;
 					case "un":
-						if( $this -> new && !isset( $seed -> $fieldname )) {
+						if( !isset($seed -> customerid) && !isset( $seed -> $fieldname )) {
 							throw new Exception( sprintf( "%s not entered, which is required for new customers." , isset($opts['title']) ? $opts['title'] : $fieldname ));
 						}
 						$regex	= "/^[a-z]([-_a-z0-9]){2,31}$/";
-						if( !preg_match( $regex , $seed -> $fieldname )) {
+						if( !isset($seed -> customerid) && !preg_match( $regex , $seed -> $fieldname )) {
 							throw new Exception( sprintf( "%s did not validate as proper username, between 3 and 32 in length, start with a letter and may only contain lowercase letters, numbers and _ or -." , isset($opts['title']) ? $opts['title'] : $fieldname ));
+						}
+						break;
+					case "pw":
+						if( !isset($seed -> customerid) && !isset( $seed -> $fieldname )) {
+							throw new Exception( sprintf( "%s not entered, which is required for new customers." , isset($opts['title']) ? $opts['title'] : $fieldname ));
 						}
 						break;
 					case "email":
