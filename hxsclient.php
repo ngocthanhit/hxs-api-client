@@ -123,7 +123,14 @@ class hxsclient {
 		return $this -> call();
 	}
 	/**
-		Supporting functions
+	*	=========================
+	*	
+	*	NOTE Supporting functions
+	*/
+	/**
+	*	Automatically Auth with the webservice and try 5 times max on 410 HTTP errorcode
+	*
+	*	@return a credentials object with the reseller-customer information and the authkey
 	*/
 	public function auth( $sandbox=false ) {
 		if( self::$attempts > 5 ) { exit(__CLASS__ . ": too many attempts to connect to remote API server"); }
