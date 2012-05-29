@@ -66,6 +66,12 @@ class hxsclient {
 		$this -> setGet();
 		return $this -> call();
 	}
+	/**
+	*	Get the current state of a domain and whether it's cancellable etc.	
+	*	@param dom		the domain to check, this is a domain name, not the object
+	*	@param customerid	the customerID this domain belongs to
+	*	@return ( name , registered , expiration , creditable , periodicity , allow-removal , state , customerid )
+	*/
 	function domainState( $dom=false , $customerid=false ) {
 		
 		$this -> constructURI( sprintf("domain/status/%s/%d" , $dom , $customerid ));
@@ -73,6 +79,13 @@ class hxsclient {
 
 		return $this -> call();
 	}
+	/**
+	*	Cancel a domain name
+	*	WARNING			THE RESELLER IS COMPLETELY RESPONSIBLE FOR CANCELLING DOMAINS SENSIBLY!
+	*	@param dom		the domain name (not the object) which you want to cancel
+	*	@param customerid	the customer ID of the domain, this is an extra security, if it mismatches the request will be denied
+	*	@param date		the cancellation date in YYYY-MM-DD format; must be at least 1 month before expiry date or after expiry date of domain (use domainState to check)
+	*/
 	function domainCancel( $dom , $customerid , $date ) {
 		$this -> constructURI( sprintf( "domain/%s/%d/%s" , $dom , $customerid , $date ));
 		$this -> setDelete();
@@ -153,6 +166,7 @@ class hxsclient {
 		$ret					= json_decode( curl_exec( $this -> c ));
 		$debug					= $this -> debug();
 		if( is_null($ret) && $debug['http_code'] == 410 ) {
+			$this -> apikey			= false;
 			$this -> auth();
 			return $this -> call();
 			
@@ -200,7 +214,7 @@ class hxs_customer {
 	private function validateSeed( $seed ) {
 		// validate seed as either object or array
 		if( !is_object( $seed ) && is_array( $seed )) {
-			$tmp		= new Object;
+			$tmp		= new hxs_customer;
 			foreach( $seed as $field => $value ) {
 				$tmp -> $field = $value;
 			}
@@ -302,6 +316,10 @@ class hxs_customer {
 			// field is required
 			if( isset( $opts['required'] ) && !isset( $seed -> $fieldname )) {
 				throw new Exception( sprintf( "%s is required." , isset($opts['title']) ? $opts['title'] : $fieldname ) );
+			}
+			// field is not set and not required
+			if( !isset( $opts['required'] ) && !isset( $seed -> $fieldname )) {
+				continue;
 			}
 			if( isset( $seed -> $fieldname ) && isset( $opts['validates'] )) {
 				switch( $opts['validates'] ) {
