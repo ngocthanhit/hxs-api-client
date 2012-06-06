@@ -84,7 +84,7 @@ class hxsclient {
 	*	WARNING			THE RESELLER IS COMPLETELY RESPONSIBLE FOR CANCELLING DOMAINS SENSIBLY!
 	*	@param dom		the domain name (not the object) which you want to cancel
 	*	@param customerid	the customer ID of the domain, this is an extra security, if it mismatches the request will be denied
-	*	@param date		the cancellation date in YYYY-MM-DD format; must be at least 1 month before expiry date or after expiry date of domain (use domainState to check)
+	*	@param date		the cancellation date in YYYY-MM-DD format; must be at least 1 month in the future (use domainState to check expirey of domains)
 	*/
 	function domainCancel( $dom , $customerid , $date ) {
 		$this -> constructURI( sprintf( "domain/%s/%d/%s" , $dom , $customerid , $date ));
@@ -99,6 +99,19 @@ class hxsclient {
 		$this -> constructURI( "customer/".( $customerid ? (int) $customerid : false ) );
 		$this -> setGet();
 		return $this -> call();
+	}
+	function loginCustomer( $username , $password ) {
+		$this -> constructURI( sprintf( "customer/login/" ) );
+		
+		$this -> setBasicAuth( $username , $password );
+		
+		$ret 		= $this -> call();
+		
+		$this -> setGet();
+		curl_setopt( $this -> c , CURLOPT_HTTPAUTH , false );
+		curl_setopt( $this -> c , CURLOPT_USERPWD , false );
+		
+		return $ret;
 	}
 	/**
 	*	Account (Control Panel) functions
@@ -135,10 +148,7 @@ class hxsclient {
 	public function auth( $sandbox=false ) {
 		if( self::$attempts > 5 ) { exit(__CLASS__ . ": too many attempts to connect to remote API server"); }
 		$this -> constructURI( sprintf( "auth/login/%s" , ($sandbox ? 1 : false) ));
-#		$this -> constructURI( "auth/login/?ip=".$_SERVER['REMOTE_ADDR'] );
-		curl_setopt( $this -> c , CURLOPT_HTTPAUTH , CURLAUTH_BASIC );
-#		$this -> setGet();
-		curl_setopt( $this -> c , CURLOPT_USERPWD , implode(":", array( (int) $this -> un , (string) $this -> pw )));
+		$this -> setBasicAuth( (int) $this -> un , (string) $this -> pw );
 		$this -> auth				= json_decode( curl_exec( $this -> c ));
 		if( $this -> error ) {
 			return false;
@@ -151,6 +161,11 @@ class hxsclient {
 	}
 	public function debug() {
 		return curl_getinfo( $this -> c );
+	}
+	// BASIC AUTH
+	private function setBasicAuth( $un , $pw ) {
+		curl_setopt( $this -> c , CURLOPT_HTTPAUTH , CURLAUTH_BASIC );
+		curl_setopt( $this -> c , CURLOPT_USERPWD , implode(":", array( $un , $pw )));
 	}
 	// SAVE
 	private function setPut() {
