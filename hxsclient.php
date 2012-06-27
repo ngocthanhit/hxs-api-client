@@ -51,20 +51,44 @@ class hxsclient {
 		return $ret;
 	}
 	/**
-		Domain checking
+	*	Domain checking
+	*
+	*	@note	verifies the availability and pricing of a domain
+	*	@param	dom	(string) the domain name
+	*	@return false or a domain object with availability, prices and alternatives when not available
 	*/
 	function checkDomain( $dom=false ) {
-		return array_shift($this -> checkDomains( array( $dom ) ));
+		$ret  		= $this -> checkDomains( array( $dom ));
+		if( $ret && count($ret)) {
+			return array_shift($this -> checkDomains( array( $dom ) ));
+		}
+		return false;
 	}
+	/**
+	*	@param	doms	(array) of (strings) domain names
+	*	@return false or array of domain objects which were validated
+	*/
 	function checkDomains( $doms=false ) {
 		if( !$doms || !is_array( $doms ) || !count( $doms ) ) {
 			# this is not possible
 			$this -> error[]		= "No domains or no array of domains given.";
 			return false;
 		}
-		$this -> constructURI( "domain/".implode(",",$doms) );
-		$this -> setGet();
-		return $this -> call();
+		$i	= 0;
+		foreach( $doms as $d ) {
+			$tmp 	= new hxsdomain( $d );
+			if( !$tmp -> valid ) {
+				$this -> error[]	= sprintf( "Domain is not valid %s" , $d );
+			}
+			$check[]	= $tmp -> name;
+			$i++;
+		}
+		if( $i > 0 ) {
+			$this -> constructURI( "domain/".implode(",",$check) );
+			$this -> setGet();
+			return $this -> call();
+		}
+		return false;
 	}
 	/**
 	*	Get the current state of a domain and whether it's cancellable etc.	
@@ -100,6 +124,14 @@ class hxsclient {
 		$this -> setGet();
 		return $this -> call();
 	}
+	/**
+	*	Customer login function
+	*	@note	allow visitors to verify themselves as HostingXS customers by logging into the control panel
+	*	@param 	username	controlpanel username
+	*	@param	password	controlpanel password
+	*	@return	false or customer object
+	*
+	*/
 	function loginCustomer( $username , $password ) {
 		$this -> constructURI( sprintf( "customer/login/" ) );
 		
@@ -129,9 +161,10 @@ class hxsclient {
 	/**
 	*	Product functions
 	*	@note	do not provide an id to receive a list; products are currently filtered by HostingXS, but will be based on preset price lists
+	*	@param	id	the product ID; contact HostingXS for a list of the ID's available to you OR false to get a complete list
 	*/
 	function getProduct( $id=false ) {
-		$this -> constructURI( "product/".( $id ? (int) $id : false ) );
+		$this -> constructURI( "products/".( $id ? (int) $id : false ) );
 		$this -> setGet();
 		return $this -> call();
 	}
@@ -194,10 +227,17 @@ class hxsclient {
 			
 		}
 		if( is_null($ret)) { $ret = false; }
-
+		if( $ret -> errno && $ret -> errmsg ) { 
+			$this -> error			= $ret -> errmsg;
+			return false; 		
+		}
 		return $ret;
 	}
 	private function constructURI( $command ) {
+		if( isset($_SERVER['HTTP_X_FORWARDED_FOR'])) {
+			curl_setopt( $this -> c , CURLOPT_HTTPHEADER , array( sprintf( "X_FORWARDED_FOR: %s" , $_SERVER['HTTP_X_FORWARDED_FOR'] ) ) );
+		}
+		
 		curl_setopt( $this -> c , CURLOPT_URL , $this -> url . $command . ($this -> apikey ? "?apikey=".$this -> apikey : "?ip=".$_SERVER['REMOTE_ADDR'] ));
 		return true;
 	}
@@ -409,4 +449,27 @@ class hxs_customer {
 		}
 		return $this;
 	}
+}
+
+class hxsdomain {
+        private $domregex               = "/(www\.)?(?<hostname>[a-zA-Z0-9\-]+)(\.(?<tld>[a-zA-Z]{2,6}))?(\.(?<tld2>[a-zA-Z]{2,6}))?/i";
+        public $valid 			= false;
+
+        function __construct( $domain ) {
+                preg_match($this -> domregex,$domain,$m);
+                if(!isset($m['hostname']) || $m['hostname'] == '') {
+                        $this -> valid 	= false;
+                        return false;
+                }
+                if( !isset($m['tld']) || $m['tld'] == "" ) {
+                        $this -> tld    = "nl";
+                } elseif( isset( $m['tld2']) ) {
+                        $this -> tld    = $m['tld'].".".$m['tld2'];
+                } else {
+                        $this -> tld    = $m['tld'];
+                }
+                $this -> name           = $m['hostname'].".".$this -> tld;
+
+                $this -> valid          = true;
+        }
 }
