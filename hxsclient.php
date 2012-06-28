@@ -60,7 +60,7 @@ class hxsclient {
 	function checkDomain( $dom=false ) {
 		$ret  		= $this -> checkDomains( array( $dom ));
 		if( $ret && count($ret)) {
-			return array_shift($this -> checkDomains( array( $dom ) ));
+			return array_shift($ret);
 		}
 		return false;
 	}
@@ -227,7 +227,7 @@ class hxsclient {
 			
 		}
 		if( is_null($ret)) { $ret = false; }
-		if( $ret -> errno && $ret -> errmsg ) { 
+		elseif( isset($ret -> errno) && isset($ret -> errmsg) ) { 
 			$this -> error			= $ret -> errmsg;
 			return false; 		
 		}
@@ -242,7 +242,9 @@ class hxsclient {
 		return true;
 	}
 	private function continueSession() {
-		@session_start();
+		if( session_id() == "" ) {
+			session_start();
+		}
 		if( isset($_SESSION['hxsapikey']) ) {
 			$this -> apikey 		= $_SESSION['hxsapikey'];
 		}
