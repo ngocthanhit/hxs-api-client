@@ -23,14 +23,17 @@ class hxsclient {
 	public $error		= false;
 	static private $attempts	= 0;
 	
-	function __construct( $un , $pw , $sandbox=false ) {
+	function __construct( $un , $pw , $sandbox=false , $apikey=false ) {
 		$this -> continueSession();
 		$this -> c			= curl_init();
 		curl_setopt( $this -> c , CURLOPT_RETURNTRANSFER , true );
 		curl_setopt( $this -> c , CURLOPT_HTTPHEADER , array( "Content-Type: application/json" ));
 		$this -> un			= $un;
 		$this -> pw			= $pw;
-		if( !$this -> apikey ) {
+		if( isset($apikey) && !$this -> apikey ) {
+			$this -> apikey		= $apikey;
+		}
+		elseif( !$this -> apikey ) {
 			$this -> auth( $sandbox );
 		}
 	}
@@ -169,6 +172,14 @@ class hxsclient {
 		return $this -> call();
 	}
 	/**
+	*	Get APIKEY
+	*	@note	get the apikey of the current session, might be useful to connect with your own orders etc
+	*	@return apikey
+	*/
+	public function getApikey() {
+		return $this -> apikey;
+	}
+	/**
 	*	=========================
 	*	
 	*	NOTE Supporting functions
@@ -185,7 +196,7 @@ class hxsclient {
 		$this -> constructURI( sprintf( "auth/login/%s" , ($sandbox ? 1 : false) ));
 		$this -> setBasicAuth( (int) $this -> un , (string) $this -> pw );
 		$this -> auth				= json_decode( curl_exec( $this -> c ));
-		if( $this -> error ) {
+		if( $this -> error || !isset($this -> auth -> apikey) ) {
 			return false;
 		}
 		$this -> apikey				= $this -> auth -> apikey;
