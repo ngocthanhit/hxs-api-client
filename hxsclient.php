@@ -14,7 +14,7 @@
 	i)	Costs forthcoming from mis-/abusing this client library are passed on to the (client) implementer
 	
 	@author		D. Klabbers - HostingXS B.V.
-	@date		22 Mai 2012
+	@date		June 28 2012
 */
 class hxsclient {
 	// URL is fixed; we highly recommend leaving it as is
@@ -179,14 +179,16 @@ class hxsclient {
 	*	@return a credentials object with the reseller-customer information and the authkey
 	*/
 	public function auth( $sandbox=false ) {
-		if( self::$attempts > 5 ) { exit(__CLASS__ . ": too many attempts to connect to remote API server"); }
+		if( self::$attempts > 5 ) { 
+			throw new Exception(__CLASS__ . ": too many attempts to connect to remote API server"); 
+		}
 		$this -> constructURI( sprintf( "auth/login/%s" , ($sandbox ? 1 : false) ));
 		$this -> setBasicAuth( (int) $this -> un , (string) $this -> pw );
 		$this -> auth				= json_decode( curl_exec( $this -> c ));
 		if( $this -> error ) {
 			return false;
 		}
-		$this -> apikey		= $this -> auth -> apikey;
+		$this -> apikey				= $this -> auth -> apikey;
 		$this -> setGet();
 		curl_setopt( $this -> c , CURLOPT_HTTPAUTH , false );
 		curl_setopt( $this -> c , CURLOPT_USERPWD , false );
