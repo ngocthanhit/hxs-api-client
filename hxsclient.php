@@ -30,7 +30,7 @@ class hxsclient {
 		curl_setopt( $this -> c , CURLOPT_HTTPHEADER , array( "Content-Type: application/json" ));
 		$this -> un			= $un;
 		$this -> pw			= $pw;
-		if( isset($apikey) && !$this -> apikey ) {
+		if( $apikey && !$this -> apikey ) {
 			$this -> apikey		= $apikey;
 		}
 		elseif( !$this -> apikey ) {
