@@ -32,9 +32,10 @@ class hxsclient {
 		$this -> pw			= $pw;
 		if( $apikey && !$this -> apikey ) {
 			$this -> apikey		= $apikey;
+			return true;
 		}
 		elseif( !$this -> apikey ) {
-			$this -> auth( $sandbox );
+			return $this -> auth( $sandbox );
 		}
 	}
 	/**
