@@ -257,7 +257,7 @@ class hxsclient {
 	}
 	private function continueSession() {
 		if( session_id() == "" ) {
-			session_start();
+			@session_start();
 		}
 		if( isset($_SESSION['hxsapikey']) ) {
 			$this -> apikey 		= $_SESSION['hxsapikey'];
@@ -266,7 +266,9 @@ class hxsclient {
 	function __destruct() {
 		if( $this -> apikey ) {
 			// probably unnecessary but do it anyway
-			@session_start();
+			if( session_id() == "" ) {
+				@session_start();
+			}
 			$_SESSION['hxsapikey']		= $this -> apikey;
 		}
 	}
