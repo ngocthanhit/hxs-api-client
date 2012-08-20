@@ -129,6 +129,24 @@ class hxsclient {
 		return $this -> call();
 	}
 	/**
+	*	Customer test function
+	*	@note tests wether the entered form data is correct/sufficient
+	*	@param	in		the array of form elements/values
+	*	@return	false or customer object on success
+	*/
+	function testCustomer( $in=false ) {
+		if( !$in ) { return false; }
+		$this -> constructURI( "customer/" );
+		$this -> setPost();
+		
+		$this -> setPostVariables( $in );
+		
+		$ret	= $this -> call();
+		$this -> unSetPostVariables();
+		
+		return $ret;
+	}
+	/**
 	*	Customer login function
 	*	@note	allow visitors to verify themselves as HostingXS customers by logging into the control panel
 	*	@param 	username	controlpanel username
@@ -230,6 +248,15 @@ class hxsclient {
 	private function setDelete() {
 		curl_setopt( $this -> c , CURLOPT_CUSTOMREQUEST , "DELETE" );
 	}
+	private function setPostVariables($vars=false) {
+		if( !$vars || !is_array($vars) || !count($vars)) {
+			return false;
+		}
+		curl_setopt( $this -> c , CURLOPT_POSTFIELDS , $in );
+	}
+	private function unSetPostVariables() {
+		curl_setopt( $this -> c , CURLOPT_POSTFIELDS , NULL );
+	}
 	private function call() {
 		
 		$ret					= json_decode( curl_exec( $this -> c ));
@@ -261,6 +288,7 @@ class hxsclient {
 		}
 		if( isset($_SESSION['hxsapikey']) ) {
 			$this -> apikey 		= $_SESSION['hxsapikey'];
+			$this -> auth			= $_SESSION['auth'];
 		}
 	}
 	function __destruct() {
@@ -269,6 +297,7 @@ class hxsclient {
 			if( session_id() == "" ) {
 				@session_start();
 			}
+			$_SESSION['auth']	 	= $this -> auth;
 			$_SESSION['hxsapikey']		= $this -> apikey;
 		}
 	}
