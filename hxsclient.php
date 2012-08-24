@@ -252,7 +252,8 @@ class hxsclient {
 		if( !$vars || !is_array($vars) || !count($vars)) {
 			return false;
 		}
-		curl_setopt( $this -> c , CURLOPT_POSTFIELDS , $vars );
+		$this -> setPost();
+		curl_setopt( $this -> c , CURLOPT_POSTFIELDS , json_encode($vars) );
 	}
 	protected function unSetPostVariables() {
 		curl_setopt( $this -> c , CURLOPT_POSTFIELDS , NULL );
