@@ -228,37 +228,37 @@ class hxsclient {
 		return curl_getinfo( $this -> c );
 	}
 	// BASIC AUTH
-	private function setBasicAuth( $un , $pw ) {
+	protected function setBasicAuth( $un , $pw ) {
 		curl_setopt( $this -> c , CURLOPT_HTTPAUTH , CURLAUTH_BASIC );
 		curl_setopt( $this -> c , CURLOPT_USERPWD , implode(":", array( $un , $pw )));
 	}
 	// SAVE
-	private function setPut() {
+	protected function setPut() {
 		curl_setopt( $this -> c , CURLOPT_CUSTOMREQUEST , "PUT" );
 	}
 	// LOAD
-	private function setGet() {
+	protected function setGet() {
 		curl_setopt( $this -> c , CURLOPT_HTTPGET , true );
 	}
 	// INSERT
-	private function setPost() {
+	protected function setPost() {
 		curl_setopt( $this -> c , CURLOPT_POST , true );
 	}
 	// ERASE
-	private function setDelete() {
+	protected function setDelete() {
 		curl_setopt( $this -> c , CURLOPT_CUSTOMREQUEST , "DELETE" );
 	}
-	private function setPostVariables($vars=false) {
+	protected function setPostVariables($vars=false) {
 		if( !$vars || !is_array($vars) || !count($vars)) {
 			return false;
 		}
-		curl_setopt( $this -> c , CURLOPT_POSTFIELDS , $in );
+		curl_setopt( $this -> c , CURLOPT_POSTFIELDS , $vars );
 	}
-	private function unSetPostVariables() {
+	protected function unSetPostVariables() {
 		curl_setopt( $this -> c , CURLOPT_POSTFIELDS , NULL );
 		$this -> setGet();
 	}
-	private function call() {
+	protected function call() {
 		
 		$ret					= json_decode( curl_exec( $this -> c ));
 		$debug					= $this -> debug();
@@ -275,7 +275,7 @@ class hxsclient {
 		}
 		return $ret;
 	}
-	private function constructURI( $command ) {
+	protected function constructURI( $command ) {
 		if( isset($_SERVER['HTTP_X_FORWARDED_FOR'])) {
 			curl_setopt( $this -> c , CURLOPT_HTTPHEADER , array( sprintf( "X_FORWARDED_FOR: %s" , $_SERVER['HTTP_X_FORWARDED_FOR'] ) ) );
 		}
@@ -283,7 +283,7 @@ class hxsclient {
 		curl_setopt( $this -> c , CURLOPT_URL , $this -> url . $command . ($this -> apikey ? "?apikey=".$this -> apikey : "?ip=".$_SERVER['REMOTE_ADDR'] ));
 		return true;
 	}
-	private function continueSession() {
+	protected function continueSession() {
 		if( session_id() == "" ) {
 			@session_start();
 		}
