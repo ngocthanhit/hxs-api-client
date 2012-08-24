@@ -49,9 +49,9 @@ class hxsclient {
 							"domain"	=> $domains,
 							"customer"	=> $customer
 		);
-		curl_setopt( $this -> c , CURLOPT_POSTFIELDS , json_encode($post) );
+		$this -> setPostVariables( $post );
 		$ret				= $this -> call();
-		$this -> setGet();
+		$this -> unSetPostVariables();
 		return $ret;
 	}
 	/**
@@ -256,6 +256,7 @@ class hxsclient {
 	}
 	private function unSetPostVariables() {
 		curl_setopt( $this -> c , CURLOPT_POSTFIELDS , NULL );
+		$this -> setGet();
 	}
 	private function call() {
 		
