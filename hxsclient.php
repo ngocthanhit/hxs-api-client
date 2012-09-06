@@ -68,8 +68,11 @@ class hxsclient {
 		$post				= array(
 							"product" 	=> $products,
 							"domain"	=> $domains,
-							"customer"	=> $customer
+							"customer"	=> $customer,
 		);
+		if( $this -> isaffiliate && !$this -> isreseller ) {
+			$post['affiliatemode']	= 1;
+		}
 		$this -> setPostVariables( $post );
 		$ret				= $this -> call();
 		$this -> unSetPostVariables();
