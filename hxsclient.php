@@ -21,6 +21,10 @@ class hxsclient {
 	private $url		= "https://api.hostingxs.nl/v2/";
 	private $apikey		= false;
 	public $error		= false;
+	
+	private $isreseller	= false;
+	private $isaffiliate	= false;
+	
 	static private $attempts	= 0;
 	
 	function __construct( $un , $pw , $sandbox=false , $apikey=false ) {
@@ -37,6 +41,23 @@ class hxsclient {
 		elseif( !$this -> apikey ) {
 			return $this -> auth( $sandbox );
 		}
+	}
+	/**
+		Api client types
+	*/
+	public function isreseller() {
+		return $this -> isreseller;
+	}
+	public function isaffiliate() {
+		return $this -> isaffiliate;
+	}
+	/**
+	*	Overrule the order (or any other call) to be treated as an affiliate, not as a reseller
+	*	@note this only works if you are also an affiliate
+	*/
+	public function setaffiliate() {
+		$this -> isaffiliate	= true;
+		$this -> isreseller	= !$this -> isaffiliate;
 	}
 	/**
 		Order functions
@@ -219,6 +240,8 @@ class hxsclient {
 			return false;
 		}
 		$this -> apikey				= $this -> auth -> apikey;
+		$this -> isreseller			= $this -> auth -> info -> isreseller;
+		$this -> isaffiliate			= !$this -> isreseller;
 		$this -> setGet();
 		curl_setopt( $this -> c , CURLOPT_HTTPAUTH , false );
 		curl_setopt( $this -> c , CURLOPT_USERPWD , false );
@@ -228,38 +251,38 @@ class hxsclient {
 		return curl_getinfo( $this -> c );
 	}
 	// BASIC AUTH
-	protected function setBasicAuth( $un , $pw ) {
+	private function setBasicAuth( $un , $pw ) {
 		curl_setopt( $this -> c , CURLOPT_HTTPAUTH , CURLAUTH_BASIC );
 		curl_setopt( $this -> c , CURLOPT_USERPWD , implode(":", array( $un , $pw )));
 	}
 	// SAVE
-	protected function setPut() {
+	private function setPut() {
 		curl_setopt( $this -> c , CURLOPT_CUSTOMREQUEST , "PUT" );
 	}
 	// LOAD
-	protected function setGet() {
+	private function setGet() {
 		curl_setopt( $this -> c , CURLOPT_HTTPGET , true );
 	}
 	// INSERT
-	protected function setPost() {
+	private function setPost() {
 		curl_setopt( $this -> c , CURLOPT_POST , true );
 	}
 	// ERASE
-	protected function setDelete() {
+	private function setDelete() {
 		curl_setopt( $this -> c , CURLOPT_CUSTOMREQUEST , "DELETE" );
 	}
-	protected function setPostVariables($vars=false) {
+	private function setPostVariables($vars=false) {
 		if( !$vars || !is_array($vars) || !count($vars)) {
 			return false;
 		}
 		$this -> setPost();
 		curl_setopt( $this -> c , CURLOPT_POSTFIELDS , json_encode($vars) );
 	}
-	protected function unSetPostVariables() {
+	private function unSetPostVariables() {
 		curl_setopt( $this -> c , CURLOPT_POSTFIELDS , NULL );
 		$this -> setGet();
 	}
-	protected function call() {
+	private function call() {
 		
 		$ret					= json_decode( curl_exec( $this -> c ));
 		$debug					= $this -> debug();
@@ -276,7 +299,7 @@ class hxsclient {
 		}
 		return $ret;
 	}
-	protected function constructURI( $command ) {
+	private function constructURI( $command ) {
 		if( isset($_SERVER['HTTP_X_FORWARDED_FOR'])) {
 			curl_setopt( $this -> c , CURLOPT_HTTPHEADER , array( sprintf( "X_FORWARDED_FOR: %s" , $_SERVER['HTTP_X_FORWARDED_FOR'] ) ) );
 		}
@@ -284,7 +307,7 @@ class hxsclient {
 		curl_setopt( $this -> c , CURLOPT_URL , $this -> url . $command . ($this -> apikey ? "?apikey=".$this -> apikey : "?ip=".$_SERVER['REMOTE_ADDR'] ));
 		return true;
 	}
-	protected function continueSession() {
+	private function continueSession() {
 		if( session_id() == "" ) {
 			@session_start();
 		}
