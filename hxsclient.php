@@ -21,6 +21,10 @@ class hxsclient {
 	private $url		= "https://api.hostingxs.nl/v2/";
 	private $apikey		= false;
 	public $error		= false;
+	
+	private $isreseller	= false;
+	private $isaffiliate	= false;
+	
 	static private $attempts	= 0;
 	
 	function __construct( $un , $pw , $sandbox=false , $apikey=false ) {
@@ -39,6 +43,23 @@ class hxsclient {
 		}
 	}
 	/**
+		Api client types
+	*/
+	public function isreseller() {
+		return $this -> isreseller;
+	}
+	public function isaffiliate() {
+		return $this -> isaffiliate;
+	}
+	/**
+	*	Overrule the order (or any other call) to be treated as an affiliate, not as a reseller
+	*	@note this only works if you are also an affiliate
+	*/
+	public function setaffiliate() {
+		$this -> isaffiliate	= true;
+		$this -> isreseller	= !$this -> isaffiliate;
+	}
+	/**
 		Order functions
 	*/
 	function order( $customer , $domains=false , $products=false ) {
@@ -47,12 +68,15 @@ class hxsclient {
 		$post				= array(
 							"product" 	=> $products,
 							"domain"	=> $domains,
-							"customer"	=> $customer
+							"customer"	=> $customer,
 		);
 		$this -> setPostVariables( $post );
 		$ret				= $this -> call();
 		$this -> unSetPostVariables();
 		$this -> setGet();
+		if( $this -> isaffiliate && !$this -> isreseller ) {
+			$post['affiliatemode']	= 1;
+		}
 		return $ret;
 	}
 	/**
@@ -186,7 +210,7 @@ class hxsclient {
 	*	@param	id	the product ID; contact HostingXS for a list of the ID's available to you OR false to get a complete list
 	*/
 	function getProduct( $id=false ) {
-		$this -> constructURI( "products/".( $id ? (int) $id : false ) );
+		$this -> constructURI( "products/".( $id ? $id : false ) );
 		$this -> setGet();
 		return $this -> call();
 	}
@@ -219,6 +243,8 @@ class hxsclient {
 			return false;
 		}
 		$this -> apikey				= $this -> auth -> apikey;
+		$this -> isreseller			= $this -> auth -> info -> isreseller;
+		$this -> isaffiliate			= !$this -> isreseller;
 		$this -> setGet();
 		curl_setopt( $this -> c , CURLOPT_HTTPAUTH , false );
 		curl_setopt( $this -> c , CURLOPT_USERPWD , false );
@@ -252,10 +278,12 @@ class hxsclient {
 		if( !$vars || !is_array($vars) || !count($vars)) {
 			return false;
 		}
+		$this -> setPost();
 		curl_setopt( $this -> c , CURLOPT_POSTFIELDS , json_encode($vars) );
 	}
 	private function unSetPostVariables() {
 		curl_setopt( $this -> c , CURLOPT_POSTFIELDS , NULL );
+		$this -> setGet();
 	}
 	private function call() {
 		
@@ -267,7 +295,10 @@ class hxsclient {
 			return $this -> call();
 			
 		}
-		if( is_null($ret)) { $ret = false; }
+		if( $debug['http_code'] == 201 ) {
+			return true;
+		} 
+		elseif( is_null($ret)) { $ret = false; }
 		elseif( isset($ret -> errno) && isset($ret -> errmsg) ) { 
 			$this -> error			= $ret -> errmsg;
 			return false; 		
@@ -367,7 +398,7 @@ class hxs_customer {
 								"phone"	=> array(
 												"required",
 												"title"		=> "phone number",
-												"validates"	=> "phone",
+												"validates"	=> "string",
 								),
 								"email"	=> array(
 												"required",
@@ -420,6 +451,26 @@ class hxs_customer {
 												"title"		=> "send invoice to reseller",
 												"validates"	=> "boolean",
 								),
+								"autodebit" 	=> array(
+												"title"		=> "enable auto debit",
+												"validates"	=> "boolean",
+								),
+								"autodebit_name"	=> array(
+												"title"		=> "bank account name",
+												"validates"	=> "string",
+								),
+								"autodebit_city"	=> array(
+												"title"		=> "bank account city",
+												"validates"	=> "string",
+								),
+								"autodebit_account"	=> array(
+												"title"		=> "bank account account",
+												"validates"	=> "string",
+								),
+								"autodebit_bank" 	=> array(
+												"title"		=> "bank account type",
+												"validates"	=> "boolean",
+								),
 		);
 		foreach( $fields as $fieldname => $opts ) {
 			// field is required
@@ -444,14 +495,17 @@ class hxs_customer {
 						$seed -> $fieldname		= (int) $seed -> $fieldname;
 						break;
 					case "date":
-						if( $fieldname == "dob" && !isset($seed -> $fieldname) && $seed -> legal != 9 ) { continue; }
+						if( $fieldname == "dob" && empty($seed -> $fieldname) && $seed -> legal != 9 ) {
+							$seed -> $fieldname	= "0000-00-00";
+							break;
+						}
 						$regex	= "/^[0-9]{4}-[0-9]{2}-[0-9]{2}$/i";
 						if( !preg_match( $regex , $seed -> $fieldname )) {
 							throw new Exception( sprintf( "%s did not validate as proper date, use YYYY-MM-DD." , isset($opts['title']) ? $opts['title'] : $fieldname ));
 						}
 						break;
 					case "phone":
-						$regex	= "/^((\+|00)[0-9]{2})([0-9-\. ]{5,})?$/i";
+						$regex	= "/^([0-9-.+ ]{5,})$/";
 						if( !preg_match( $regex , $seed -> $fieldname )) {
 							throw new Exception( sprintf( "%s did not validate as a proper phone number, either use an international format or a national one." , isset($opts['title']) ? $opts['title'] : $fieldname ));
 						}
@@ -483,8 +537,12 @@ class hxs_customer {
 						}
 						break;
 					case "boolean":
-						if( !is_bool($seed -> fieldname ) && !is_int($seed -> $fieldname ) ) {
+						if( isset($seed -> fieldname) && !is_bool((bool)$seed -> $fieldname ) && !is_int((int)$seed -> $fieldname )) {
 							throw new Exception( sprintf( "%s not enabled or disabled." , isset($opts['title']) ? $opts['title'] : $fieldname ));
+						} elseif( !isset($seed -> $fieldname) ) {
+							$seed -> $fieldname	= false;
+						} else {
+							$seed -> $fieldname	= (bool) $seed -> $fieldname;
 						}
 						break;
 				}
