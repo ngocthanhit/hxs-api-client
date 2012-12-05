@@ -49,8 +49,9 @@ class hxsclient {
 							"domain"	=> $domains,
 							"customer"	=> $customer
 		);
-		curl_setopt( $this -> c , CURLOPT_POSTFIELDS , json_encode($post) );
+		$this -> setPostVariables( $post );
 		$ret				= $this -> call();
+		$this -> unSetPostVariables();
 		$this -> setGet();
 		return $ret;
 	}
@@ -136,15 +137,14 @@ class hxsclient {
 	*/
 	function testCustomer( $in=false ) {
 		if( !$in ) { return false; }
-		$this -> constructURI( "customer/" );
-		$this -> setPost();
+		try {
+			$c		= new hxs_customer( $in );
+		} catch( Exception $e ) {
+			$this -> error = $e;
+			return false;
+		}
 		
-		$this -> setPostVariables( $in );
-		
-		$ret	= $this -> call();
-		$this -> unSetPostVariables();
-		
-		return $ret;
+		return $c;
 	}
 	/**
 	*	Customer login function
@@ -252,7 +252,7 @@ class hxsclient {
 		if( !$vars || !is_array($vars) || !count($vars)) {
 			return false;
 		}
-		curl_setopt( $this -> c , CURLOPT_POSTFIELDS , $in );
+		curl_setopt( $this -> c , CURLOPT_POSTFIELDS , json_encode($vars) );
 	}
 	private function unSetPostVariables() {
 		curl_setopt( $this -> c , CURLOPT_POSTFIELDS , NULL );
@@ -427,7 +427,7 @@ class hxs_customer {
 				throw new Exception( sprintf( "%s is required." , isset($opts['title']) ? $opts['title'] : $fieldname ) );
 			}
 			// field is not set and not required
-			if( !isset( $opts['required'] ) && !isset( $seed -> $fieldname )) {
+			if( !isset( $opts['required'] ) && (!isset( $seed -> $fieldname ) || $seed -> $fieldname == "" )) {
 				continue;
 			}
 			if( isset( $seed -> $fieldname ) && isset( $opts['validates'] )) {
@@ -495,6 +495,45 @@ class hxs_customer {
 			$this -> $fieldname 	= $seed -> $fieldname;
 		}
 		return $this;
+	}
+	static public function pwstrength($value) {
+		$matchlc = "/[a-z]/";
+		$matchuc = "/[A-Z]/";
+		$matchdig = "/\d/";
+		$matchother = "/[^0-9A-Za-z]/";
+		$match2good = "/[^a-z].*[^a-z]/";
+		$points = 0;
+		if (preg_match($matchlc,$value)) {
+			$points += 2;
+			$m[1]	= true;
+		}
+		if (preg_match($matchuc,$value)) {
+			$points += 2;
+			$m[2]	= true;
+		}
+		if (preg_match($matchdig,$value)) {
+			$points += 3;
+			$m[3]	= true;
+		}
+		if (preg_match($matchother,$value)) {
+			$points += 4;
+			$m[4]	= true;
+		}
+		if ((isset($m[1]) || isset($m[2])) && isset($m[3]) ) {
+			$points += 2;
+			$m[5]	= true;
+		}
+		if ((isset($m[1]) || isset($m[2])) && isset($tm[4])) {
+			$points += 2;
+			$tm[6]	= true;
+		}
+		$score		= $points * strlen($value);
+		if (!(preg_match($match2good,$value) && strlen($value) >= 6) && $score >= 42)
+			$score = 41;
+			
+		if( $score > 41 )
+			return true;
+		return false;
 	}
 }
 
