@@ -70,13 +70,13 @@ class hxsclient {
 							"domain"	=> $domains,
 							"customer"	=> $customer,
 		);
+		if( $this -> isaffiliate && !$this -> isreseller ) {
+			$post['affiliatemode']	= 1;
+		}
 		$this -> setPostVariables( $post );
 		$ret				= $this -> call();
 		$this -> unSetPostVariables();
 		$this -> setGet();
-		if( $this -> isaffiliate && !$this -> isreseller ) {
-			$post['affiliatemode']	= 1;
-		}
 		return $ret;
 	}
 	/**
