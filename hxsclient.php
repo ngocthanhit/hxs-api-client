@@ -25,6 +25,10 @@ class hxsclient {
 	private $isreseller	= false;
 	private $isaffiliate	= false;
 	
+	private $mode		= "Get";
+	private $request	= NULL;
+	private $sandbox	= false;
+	
 	static private $attempts	= 0;
 	
 	function __construct( $un , $pw , $sandbox=false , $apikey=false ) {
@@ -34,12 +38,10 @@ class hxsclient {
 		curl_setopt( $this -> c , CURLOPT_HTTPHEADER , array( "Content-Type: application/json" ));
 		$this -> un			= $un;
 		$this -> pw			= $pw;
+		$this -> sandbox		= (bool) $sandbox;
 		if( $apikey && !$this -> apikey ) {
 			$this -> apikey		= $apikey;
 			return true;
-		}
-		elseif( !$this -> apikey ) {
-			return $this -> auth( $sandbox );
 		}
 	}
 	/**
@@ -62,7 +64,7 @@ class hxsclient {
 	/**
 		Order functions
 	*/
-	function order( $customer , $domains=false , $products=false ) {
+	function order( $customer , $domains=false , $products=false , $note=false ) {
 		$this -> constructURI( "order/" );
 		$this -> setPost();
 		$post				= array(
@@ -72,6 +74,10 @@ class hxsclient {
 		);
 		if( $this -> isaffiliate && !$this -> isreseller ) {
 			$post['affiliatemode']	= 1;
+		}
+		if( $note )
+		{
+			$post['note']		= $note;
 		}
 		$this -> setPostVariables( $post );
 		$ret				= $this -> call();
@@ -164,7 +170,7 @@ class hxsclient {
 		try {
 			$c		= new hxs_customer( $in );
 		} catch( Exception $e ) {
-			$this -> error = $e;
+			$this -> error = $e -> getMessage();
 			return false;
 		}
 		
@@ -215,6 +221,14 @@ class hxsclient {
 		return $this -> call();
 	}
 	/**
+	*	Product Category functions
+	*/
+	function getProductCategory( $id=false ) {
+		$this -> constructURI( "products/category/".( $id ? $id : false ) );
+		$this -> setGet();
+		return $this -> call();
+	}
+	/**
 	*	Get APIKEY
 	*	@note	get the apikey of the current session, might be useful to connect with your own orders etc
 	*	@return apikey
@@ -232,23 +246,41 @@ class hxsclient {
 	*
 	*	@return a credentials object with the reseller-customer information and the authkey
 	*/
-	public function auth( $sandbox=false ) {
+	public function auth(  ) {
+		
+		self::$attempts++;
+		
+		$sandbox	= $this -> sandbox;
+		
 		if( self::$attempts > 5 ) { 
 			throw new Exception(__CLASS__ . ": too many attempts to connect to remote API server"); 
 		}
+		
 		$this -> constructURI( sprintf( "auth/login/%s" , ($sandbox ? 1 : false) ));
 		$this -> setBasicAuth( (int) $this -> un , (string) $this -> pw );
 		$this -> auth				= json_decode( curl_exec( $this -> c ));
-		if( $this -> error || !isset($this -> auth -> apikey) ) {
+		
+		$debug					= $this -> debug();
+		if( $debug['http_code'] == 410 )
+		{
+			$this -> apikey			= false;
+			return $this -> auth();
+		}
+		if( $this -> error || empty($this -> auth) || empty($this -> auth -> apikey) ) {
 			return false;
 		}
+		
+		self::$attempts	= 0;		
+
+
 		$this -> apikey				= $this -> auth -> apikey;
 		$this -> isreseller			= $this -> auth -> info -> isreseller;
 		$this -> isaffiliate			= !$this -> isreseller;
 		$this -> setGet();
+		
 		curl_setopt( $this -> c , CURLOPT_HTTPAUTH , false );
 		curl_setopt( $this -> c , CURLOPT_USERPWD , false );
-		self::$attempts++;
+		
 	}
 	public function debug() {
 		return curl_getinfo( $this -> c );
@@ -260,18 +292,22 @@ class hxsclient {
 	}
 	// SAVE
 	private function setPut() {
+		$this -> mode 	= "Put";
 		curl_setopt( $this -> c , CURLOPT_CUSTOMREQUEST , "PUT" );
 	}
 	// LOAD
 	private function setGet() {
+		$this -> mode 	= "Get";
 		curl_setopt( $this -> c , CURLOPT_HTTPGET , true );
 	}
 	// INSERT
 	private function setPost() {
+		$this -> mode 	= "Post";
 		curl_setopt( $this -> c , CURLOPT_POST , true );
 	}
 	// ERASE
 	private function setDelete() {
+		$this -> mode 	= "Delete";
 		curl_setopt( $this -> c , CURLOPT_CUSTOMREQUEST , "DELETE" );
 	}
 	private function setPostVariables($vars=false) {
@@ -285,13 +321,26 @@ class hxsclient {
 		curl_setopt( $this -> c , CURLOPT_POSTFIELDS , NULL );
 		$this -> setGet();
 	}
-	private function call() {
+	protected function call() {
+		
+		$mode		= sprintf( "set%s" , $this -> mode );
+		$request	= $this -> request;
+			
+		if( empty($this -> apikey) ) {
+			$this -> auth( );
+			$this -> $mode();
+			$this -> constructURI( $request );
+		}
 		
 		$ret					= json_decode( curl_exec( $this -> c ));
 		$debug					= $this -> debug();
+		
+#		if( false ) {		
 		if( is_null($ret) && $debug['http_code'] == 410 ) {
 			$this -> apikey			= false;
 			$this -> auth();
+			$this -> $mode();
+			$this -> constructURI( $request );
 			return $this -> call();
 			
 		}
@@ -305,12 +354,15 @@ class hxsclient {
 		}
 		return $ret;
 	}
-	private function constructURI( $command ) {
+	protected function constructURI( $command ) {
+	
+		$this -> request		= $command;
+		
+	
 		if( isset($_SERVER['HTTP_X_FORWARDED_FOR'])) {
 			curl_setopt( $this -> c , CURLOPT_HTTPHEADER , array( sprintf( "X_FORWARDED_FOR: %s" , $_SERVER['HTTP_X_FORWARDED_FOR'] ) ) );
 		}
-		
-		curl_setopt( $this -> c , CURLOPT_URL , $this -> url . $command . ($this -> apikey ? "?apikey=".$this -> apikey : "?ip=".$_SERVER['REMOTE_ADDR'] ));
+		curl_setopt( $this -> c , CURLOPT_URL , $this -> url . $this -> request . ($this -> apikey ? "?apikey=".$this -> apikey : "?ip=".$_SERVER['REMOTE_ADDR']) );
 		return true;
 	}
 	private function continueSession() {
@@ -365,57 +417,61 @@ class hxs_customer {
 		$fields			= array(
 								"firstname"	=> array(
 												"required",
-												"title"		=> "first name",
+												"title"		=> "voornaam",
 												"validates"	=> "string",
 								),
 								"lastname"	=> array(
 												"required",
-												"title"		=> "last name",
+												"title"		=> "achternaam",
 												"validates"	=> "string",
 								),
 								"initials"	=> array(
 												"required",
+												"title"		=> "initialen",
 												"validates"	=> "string",
 								),
 								"address"	=> array(
 												"required",
+												"title"		=> "adres",
 												"validates"	=> "string",
 								),
 								"postal"	=> array(
 												"required",
-												"title"		=> "postal code",
+												"title"		=> "postcode",
 												"validates"	=> "string",
 								),
 								"city"	=> array(
 												"required",
+												"title"		=> "woonplaats",
 												"validates"	=> "string",
 								),
 								"country"	=> array(
 												"required",
+												"title"		=> "land",
 												"validates"	=> "string",
 												"length"	=> 2,
 								),
 								"phone"	=> array(
 												"required",
-												"title"		=> "phone number",
+												"title"		=> "telefoonnummer",
 												"validates"	=> "string",
 								),
 								"email"	=> array(
 												"required",
-												"title"		=> "e-mail address",
+												"title"		=> "e-mail adres",
 												"validates"	=> "email",
 								),
 								// username is checked seperately
 								"un"	=> array(
-												"title"		=> "username",
+												"title"		=> "gebruikersnaam",
 								),
 								// password is checked seperately
 								"pw"	=> array(
-												"title"		=> "password",
+												"title"		=> "wachtwoord",
 								),
 								// dob only necessary for private person (legal form 9)
 								"dob"	=> array(
-												"title"		=> "date of birth",
+												"title"		=> "geboortedatum",
 												"validates"	=> "date",
 								),
 								"gender"	=> array(
@@ -423,28 +479,28 @@ class hxs_customer {
 								),
 								"houseno"	=> array(
 												"required",
-												"title"		=> "house number",
+												"title"		=> "huisnummer",
 												"validates"	=> "integer",
 								),
 								"legal"	=> array(
 												"required",
-												"title"		=> "legal form",
+												"title"		=> "rechtsvorm",
 												"validates"	=> "integer",
 								),
 								"company"	=> array(
-												"title"		=> "company name",
+												"title"		=> "bedrijfsnaam",
 												"validates"	=> "string",
 								),
 								"vat"	=> array(
-												"title"		=> "VAT number",
+												"title"		=> "BTW nummer",
 												"validates"	=> "vat",
 								),
 								"coc"	=> array(
-												"title"		=> "chamber of commerce",
+												"title"		=> "KvK nummer",
 												"validates"	=> "string",
 								),
 								"housenoext"	=> array(
-												"title"		=> "house number extension",
+												"title"		=> "huisnummer ext",
 												"validates"	=> "string",
 								),
 								"invoice_to_ref" => array(
@@ -474,23 +530,23 @@ class hxs_customer {
 		);
 		foreach( $fields as $fieldname => $opts ) {
 			// field is required
-			if( isset( $opts['required'] ) && !isset( $seed -> $fieldname )) {
-				throw new Exception( sprintf( "%s is required." , isset($opts['title']) ? $opts['title'] : $fieldname ) );
+			if( in_array( "required", $opts) && !isset( $seed -> $fieldname )) {
+				throw new Exception( sprintf( "%s is verplicht." , isset($opts['title']) ? $opts['title'] : $fieldname ) );
 			}
 			// field is not set and not required
-			if( !isset( $opts['required'] ) && (!isset( $seed -> $fieldname ) || $seed -> $fieldname == "" )) {
+			if( !in_array('required',$opts) && (!isset( $seed -> $fieldname ) || $seed -> $fieldname == "" )) {
 				continue;
 			}
 			if( isset( $seed -> $fieldname ) && isset( $opts['validates'] )) {
 				switch( $opts['validates'] ) {
 					case "string":
 						if( !is_string( $seed -> $fieldname )) {
-							throw new Exception( sprintf( "%s did not validate as proper text." , isset($opts['title']) ? $opts['title'] : $fieldname ));
+							throw new Exception( sprintf( "%s is geen geldige tekst." , isset($opts['title']) ? $opts['title'] : $fieldname ));
 						}
 						break;
 					case "integer":
 						if( !is_int( $seed -> $fieldname ) && !( (int) $seed -> $fieldname == $seed -> $fieldname )) {
-							throw new Exception( sprintf( "%s did not validate as proper number." , isset($opts['title']) ? $opts['title'] : $fieldname ));
+							throw new Exception( sprintf( "%s is geen geldig nummer." , isset($opts['title']) ? $opts['title'] : $fieldname ));
 						}
 						$seed -> $fieldname		= (int) $seed -> $fieldname;
 						break;
@@ -501,44 +557,44 @@ class hxs_customer {
 						}
 						$regex	= "/^[0-9]{4}-[0-9]{2}-[0-9]{2}$/i";
 						if( !preg_match( $regex , $seed -> $fieldname )) {
-							throw new Exception( sprintf( "%s did not validate as proper date, use YYYY-MM-DD." , isset($opts['title']) ? $opts['title'] : $fieldname ));
+							throw new Exception( sprintf( "%s is geen geldige datum, gebruik JJJJ-MM-DD." , isset($opts['title']) ? $opts['title'] : $fieldname ));
 						}
 						break;
 					case "phone":
 						$regex	= "/^([0-9-.+ ]{5,})$/";
 						if( !preg_match( $regex , $seed -> $fieldname )) {
-							throw new Exception( sprintf( "%s did not validate as a proper phone number, either use an international format or a national one." , isset($opts['title']) ? $opts['title'] : $fieldname ));
+							throw new Exception( sprintf( "%s is geen geldig telefoonnummer, gebruik of een internationale of een nationale opmaak." , isset($opts['title']) ? $opts['title'] : $fieldname ));
 						}
 						break;
 					case "un":
 						if( !isset($seed -> customerid) && !isset( $seed -> $fieldname )) {
-							throw new Exception( sprintf( "%s not entered, which is required for new customers." , isset($opts['title']) ? $opts['title'] : $fieldname ));
+							throw new Exception( sprintf( "%s is niet ingevuld, welke voor nieuwe klanten wel verplicht is." , isset($opts['title']) ? $opts['title'] : $fieldname ));
 						}
 						$regex	= "/^[a-z]([-_a-z0-9]){2,31}$/";
 						if( !isset($seed -> customerid) && !preg_match( $regex , $seed -> $fieldname )) {
-							throw new Exception( sprintf( "%s did not validate as proper username, between 3 and 32 in length, start with a letter and may only contain lowercase letters, numbers and _ or -." , isset($opts['title']) ? $opts['title'] : $fieldname ));
+							throw new Exception( sprintf( "%s is geen geldige gebruikersnaam, deze dient tussen de 3 en 32 karakters lang te zijn, te bestaan uit kleine letters, nummers en _ of -." , isset($opts['title']) ? $opts['title'] : $fieldname ));
 						}
 						break;
 					case "pw":
 						if( !isset($seed -> customerid) && !isset( $seed -> $fieldname )) {
-							throw new Exception( sprintf( "%s not entered, which is required for new customers." , isset($opts['title']) ? $opts['title'] : $fieldname ));
+							throw new Exception( sprintf( "%s is niet ingevuld, welke voor nieuwe klanten wel verplicht is." , isset($opts['title']) ? $opts['title'] : $fieldname ));
 						}
 						break;
 					case "email":
 						$regex = "/^[A-Z0-9._%-]+@[A-Z0-9.-]+\.[A-Z]{2,4}$/i";
 						if( !preg_match( $regex , $seed -> $fieldname )) {
-							throw new Exception( sprintf( "%s did not validate as proper e-mail address." , isset($opts['title']) ? $opts['title'] : $fieldname ));
+							throw new Exception( sprintf( "%s is geen geldig e-mailadres." , isset($opts['title']) ? $opts['title'] : $fieldname ));
 						}
 						break;
 					case "vat":
 						$regex = "/^([a-z]{2})?[0-9a-z]+$/i";
 						if( !preg_match( $regex , $seed -> $fieldname )) {
-							throw new Exception( sprintf( "%s did not validate as proper international VAT number." , isset($opts['title']) ? $opts['title'] : $fieldname ));
+							throw new Exception( sprintf( "%s is geen geldig BTW nummer." , isset($opts['title']) ? $opts['title'] : $fieldname ));
 						}
 						break;
 					case "boolean":
 						if( isset($seed -> fieldname) && !is_bool((bool)$seed -> $fieldname ) && !is_int((int)$seed -> $fieldname )) {
-							throw new Exception( sprintf( "%s not enabled or disabled." , isset($opts['title']) ? $opts['title'] : $fieldname ));
+							throw new Exception( sprintf( "%s is niet aangekruisd." , isset($opts['title']) ? $opts['title'] : $fieldname ));
 						} elseif( !isset($seed -> $fieldname) ) {
 							$seed -> $fieldname	= false;
 						} else {
@@ -548,7 +604,7 @@ class hxs_customer {
 				}
 			}
 			if( isset($opts['length']) && strlen( $seed -> $fieldname) != $opts['length'] ) {
-				throw new Exception( sprintf( "%s is of an incorrect length, should be %d." , isset($opts['title']) ? $opts['title'] : $fieldname , $opts['length']));
+				throw new Exception( sprintf( "%s is van een incorrecte lengte, dit dient %d te zijn." , isset($opts['title']) ? $opts['title'] : $fieldname , $opts['length']));
 			}
 			$this -> $fieldname 	= $seed -> $fieldname;
 		}
